@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Map Design</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.8.1/mapbox-gl.css" rel="stylesheet">
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+
+        #state-legend {
+            z-index: 100;
+            position: fixed;
+            color: rgb(0, 255, 21);
+            font-size: 2rem;
+            font-weight: bold;
+        }
+
+        #menu {
+            background: #fff;
+            position: absolute;
+            z-index: 1;
+            top: 10px;
+            right: 10px;
+            border-radius: 3px;
+            width: 120px;
+            border: 1px solid rgba(0, 0, 0, 0.4);
+            font-family: 'Open Sans', sans-serif;
+        }
+            
+        #menu a {
+            font-size: 13px;
+            color: #404040;
+            display: block;
+            margin: 0;
+            padding: 0;
+            padding: 10px;
+            text-decoration: none;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.25);
+            text-align: center;
+            }
+            
+        #menu a:last-child {
+            border: none;
+        }
+            
+        #menu a:hover {
+            background-color: #887b0a;
+            color: #fefeff;
+        }
+            
+        #menu a.active {
+            background-color: #3887be;
+            color: #ffffff;
+        }
+            
+        #menu a.active:hover {
+            background: #3074a4;
+        }
+    </style>
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.8.1/mapbox-gl.js"></script>
+</head>
+
+<body>
+    <nav id="menu"></nav>
+    <div id='map'></div>
+    <div id="state-legend" class="legend">
+        <h4>United States</h4>
+    </div>
+
+    <div id="legend"></div>
+    
+    <script type="text/javascript">
+        mapboxgl.accessToken =
+            'pk.eyJ1IjoiamFrb2J6aGFvIiwiYSI6ImNpcms2YWsyMzAwMmtmbG5icTFxZ3ZkdncifQ.P9MBej1xacybKcDN_jehvw';
+        let map = new mapboxgl.Map({
+            container: 'map', // container ID
+            style: 'mapbox://styles/mapbox/dark-v10',
+            zoom: 5, // starting zoom
+            center: [-84.3879824, 33.7489954] // starting center | Reference: https://www.gps-latitude-longitude.com/gps-coordinates-of-atlanta-ga
+        });
+
+        map.addControl(new mapboxgl.NavigationControl());
+
+        const grades = [4, 5, 6],
+        colors = ['rgb(208,209,230)', 'rgb(103,169,207)', 'rgb(1,108,89)'],
+        radii = [5, 15, 20];
+
+        map.on('load', () => { //simplifying the function statement: arrow with brackets to define a function
+
+            map.addSource('uw-tiles', {
+                'type': 'raster',
+                'tiles': [
+                    'tiles/uw/{z}/{x}/{y}.png'
+                ],
+                'tileSize': 256,
+                'attribution': 'Map tiles designed by</a>'
+            });
+
+            map.addSource('us-pop-data-tiles', {
+                'type': 'raster',
+                'tiles': [
+                    'tiles/choro/{z}/{x}/{y}.png'
+                ],
+                'tileSize': 256,
+                'attribution': 'Map tiles designed by</a>'
+            });
+
+            map.addSource('us-covid-counts', {
+                type: 'geojson',
+                data: 'tiles/layers-assets/us-covid-2020-counts.geojson'
+            });
+
+            map.addLayer({
+                'id': 'uw',
+                'type': 'raster',
+                'layout': {
+                    'visibility': 'none'
+                },
+                'source': 'uw-tiles'
+            });
+
+            map.addLayer({
+                'id': 'us-pop-data-layer',
+                'type': 'raster',
+                'layout': {
+                    'visibility': 'none'
+                },
+                'source': 'us-pop-data-tiles'
+            });
+
+            map.addLayer({
+                'id': 'us-covid-counts-layer',
+                'type': 'circle',
+                'source': 'us-covid-counts',
+                'minzoom': 1,
+                'layout': {
+                    'visibility': 'none'
+                },
+                'paint': {
+                    // increase the radii of the circle as the zoom level and dbh value increases
+                    'circle-radius': {
+                        'property': 'mag',
+                        'stops': [
+                            [{
+                                zoom: 5,
+                                value: grades[0]
+                            }, radii[0]],
+                            [{
+                                zoom: 5,
+                                value: grades[1]
+                            }, radii[1]],
+                            [{
+                                zoom: 5,
+                                value: grades[2]
+                            }, radii[2]]
+                        ]
+                    },
+                    'circle-color': {
+                        'property': 'mag',
+                        'stops': [
+                            [grades[0], colors[0]],
+                            [grades[1], colors[1]],
+                            [grades[2], colors[2]]
+                        ]
+                    },
+                    'circle-stroke-color': 'yellow',
+                    'circle-stroke-width': 1,
+                    'circle-opacity': 0.6
+                }
+            },
+            'waterway-label'
+        );
+
+        //Third layer
+        map.addLayer({
+                'id': 'third-layer',
+                'type': 'raster',
+                'layout': {
+                    'visibility': 'none'
+                },
+                'source': 'uw-tiles'
+            });
+
+        // click on tree to view magnitude in a popup
+        map.on('click', 'us-covid-counts-layer', (event) => {
+            new mapboxgl.Popup()
+                .setLngLat(event.features[0].geometry.coordinates)
+                .setHTML(`<strong>Magnitude:</strong> ${event.features[0].properties.mag}`)
+                .addTo(map);
+        });
+
+            // create legend
+        const legend = document.getElementById('legend');
+
+        //set up legend grades and labels
+        var labels = ['<strong>Magnitude</strong>'], vbreak;
+        //iterate through grades and create a scaled circle and label for each
+        for (var i = 0; i < grades.length; i++) {
+        vbreak = grades[i];
+        // you need to manually adjust the radius of each dot on the legend 
+        // in order to make sure the legend can be properly referred to the dot on the map.
+        dot_radii = 2 * radii[i];
+        labels.push(
+            '<p class="break"><i class="dot" style="background:' + colors[i] + '; width: ' + dot_radii +
+            'px; height: ' +
+            dot_radii + 'px; "></i> <span class="dot-label" style="top: ' + dot_radii / 2 + 'px;">' + vbreak +
+            '</span></p>');
+
+        }
+        const source =
+        '<p style="text-align: right; font-size:10pt">Source: <a href="https://data.census.gov/cedsci/table?g=0100000US.050000&d=ACS%205-Year%20Estimates%20Data%20Profiles&tid=ACSDP5Y2018.DP05&hidePreview=true">2018 ACS</a></p>';
+
+        legend.innerHTML = labels.join('') + source;
+
+        });
+
+        // After the last frame rendered before the map enters an "idle" state.
+        map.on('idle', () => {
+            // If these two layers were not added to the map, abort
+            if (!map.getLayer('uw')) {      //|| !map.getLayer('us-covid-counts-layer')
+                return;
+            }
+
+            // Enumerate ids of the layers.
+            const toggleableLayerIds = ['uw', 'us-pop-data-layer', 'us-covid-counts-layer'];
+
+            // Set up the corresponding toggle button for each layer.
+            for (const id of toggleableLayerIds) {
+                // Skip layers that already have a button set up.
+                if (document.getElementById(id)) {
+                    continue;
+                }
+
+                // Create a link.
+                const link = document.createElement('a');
+                link.id = id;
+                link.href = '#';
+
+                var dValue = "";        //Display Value
+                if(id == 'uw') {
+                    dValue = "Base Map";
+                } else if(id == 'us-covid-counts-layer') {
+                    dValue = "US Covid Counts 2020";
+                } else if(id == 'us-pop-data-layer') {
+                    dValue = "US Population";
+                }
+
+                link.textContent = dValue;
+                link.className = 'inactive';
+
+                // Show or hide layer when the toggle is clicked.
+                link.onclick = function (e) {
+                    const clickedLayer = this.id;
+                    // preventDefault() tells the user agent that if the event does not get explicitly handled, 
+                    // its default action should not be taken as it normally would be.
+                    e.preventDefault();
+                    // The stopPropagation() method prevents further propagation of the current event in the capturing 
+                    // and bubbling phases. It does not, however, prevent any default behaviors from occurring; 
+                    // for instance, clicks on links are still processed. If you want to stop those behaviors, 
+                    // see the preventDefault() method.
+                    e.stopPropagation();
+
+                    const visibility = map.getLayoutProperty(
+                        clickedLayer,
+                        'visibility'
+                    );
+
+                    // Toggle layer visibility by changing the layout object's visibility property.
+                    // if it is currently visible, after the clicking, it will be turned off.
+                    if (visibility === 'visible') {
+                        map.setLayoutProperty(clickedLayer, 'visibility', 'none');
+                        this.className = '';
+                    } else { //otherise, it will be turned on.
+                        this.className = 'active';
+                        map.setLayoutProperty(
+                            clickedLayer,
+                            'visibility',
+                            'visible'
+                        );
+                    }
+                };
+
+                // in the menu place holder, insert the layer links.
+                const layers = document.getElementById('menu');
+                layers.appendChild(link);
+            }
+
+            
+        });
+    </script>
+</body>
+
+</html>
